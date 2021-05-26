@@ -42,15 +42,15 @@ class QReaderException(Exception):
 
 class QMessage(object):
     '''
-    Represents a single message parsed from q protocol. 
+    Represents a single message parsed from q protocol.
     Encapsulates data, message size, type, compression flag.
-    
+
     :Parameters:
      - `data` - data payload
      - `message_type` (one of the constants defined in :class:`.MessageType`) -
        type of the message
-     - `message_size` (`integer`) - size of the message
-     - `is_compressed` (`boolean`) - indicates whether message is compressed
+     - `message_size` (`int`) - size of the message
+     - `compression_mode` (`int`) - indicates whether message is compressed, 1 for size<2GB, 2 for larger
     '''
 
     @property
@@ -70,9 +70,9 @@ class QMessage(object):
 
 
     @property
-    def is_compressed(self):
+    def compression_mode(self):
         '''Indicates whether source message was compressed.'''
-        return self._is_compressed
+        return self._compression_mode
 
 
     @property
@@ -81,29 +81,29 @@ class QMessage(object):
         return self._size
 
 
-    def __init__(self, data, message_type, message_size, is_compressed):
+    def __init__(self, data, message_type, message_size, compression_mode):
         self._data = data
         self._type = message_type
         self._size = message_size
-        self._is_compressed = is_compressed
+        self._compression_mode = compression_mode
 
 
     def __str__(self, *args, **kwargs):
-        return 'QMessage: message type: %s, data size: %s, is_compressed: %s, data: %s' % (self._type, self._size, self._is_compressed, self._data)
+        return 'QMessage: message type: %s, data size: %s, compression_mode: %s, data: %s' % (self._type, self._size, self._compression_mode, self._data)
 
 
 
 class QReader(object):
     '''
     Provides deserialization from q IPC protocol.
-    
+
     :Parameters:
      - `stream` (`file object` or `None`) - data input stream
      - `encoding` (`string`) - encoding for characters parsing
-     
+
     :Attrbutes:
-     - `_reader_map` - stores mapping between q types and functions 
-       responsible for parsing into Python objects    
+     - `_reader_map` - stores mapping between q types and functions
+       responsible for parsing into Python objects
     '''
 
     _reader_map = {}
@@ -119,24 +119,24 @@ class QReader(object):
     def read(self, source = None, **options):
         '''
         Reads and optionally parses a single message.
-        
+
         :Parameters:
-         - `source` - optional data buffer to be read, if not specified data is 
+         - `source` - optional data buffer to be read, if not specified data is
            read from the wrapped stream
         :Options:
-         - `raw` (`boolean`) - indicates whether read data should parsed or 
+         - `raw` (`boolean`) - indicates whether read data should parsed or
            returned in raw byte form
          - `numpy_temporals` (`boolean`) - if ``False`` temporal vectors are
-           backed by raw q representation (:class:`.QTemporalList`, 
-           :class:`.QTemporal`) instances, otherwise are represented as 
+           backed by raw q representation (:class:`.QTemporalList`,
+           :class:`.QTemporal`) instances, otherwise are represented as
            `numpy datetime64`/`timedelta64` arrays and atoms,
            **Default**: ``False``
-         
+
         :returns: :class:`.QMessage` - read data (parsed or raw byte form) along
                   with meta information
         '''
         message = self.read_header(source)
-        message.data = self.read_data(message.size, message.is_compressed, **options)
+        message.data = self.read_data(message.size, message.compression_mode, **options)
 
         return message
 
@@ -144,14 +144,14 @@ class QReader(object):
     def read_header(self, source = None):
         '''
         Reads and parses message header.
-        
+
         .. note:: :func:`.read_header` wraps data for further reading in internal
-                  buffer  
-    
+                  buffer
+
         :Parameters:
-         - `source` - optional data buffer to be read, if not specified data is 
+         - `source` - optional data buffer to be read, if not specified data is
            read from the wrapped stream
-           
+
         :returns: :class:`.QMessage` - read meta information
         '''
         if self._stream:
@@ -163,48 +163,49 @@ class QReader(object):
         self._buffer.endianness = '<' if self._buffer.get_byte() == 1 else '>'
         self._is_native = self._buffer.endianness == ('<' if sys.byteorder == 'little' else '>')
         message_type = self._buffer.get_byte()
-        message_compressed = self._buffer.get_byte() == 1
-        # skip 1 byte
-        self._buffer.skip()
+        message_compression_mode = self._buffer.get_byte()
+        message_size_ext = self._buffer.get_byte()
 
-        message_size = self._buffer.get_int()
-        return QMessage(None, message_type, message_size, message_compressed)
+        message_size = self._buffer.get_uint()
+        message_size += message_size_ext << 32
+        return QMessage(None, message_type, message_size, message_compression_mode)
 
 
-    def read_data(self, message_size, is_compressed = False, **options):
+    def read_data(self, message_size, compression_mode = 0, **options):
         '''
         Reads and optionally parses data part of a message.
-        
+
         .. note:: :func:`.read_header` is required to be called before executing
                   the :func:`.read_data`
-        
+
         :Parameters:
-         - `message_size` (`integer`) - size of the message to be read
-         - `is_compressed` (`boolean`) - indicates whether data is compressed
+         - `message_size` (`int`) - size of the message to be read
+         - `compression_mode` (`int`) - indicates whether data is compressed, 1 for <2GB, 2 for larger
         :Options:
-         - `raw` (`boolean`) - indicates whether read data should parsed or 
+         - `raw` (`boolean`) - indicates whether read data should parsed or
            returned in raw byte form
          - `numpy_temporals` (`boolean`) - if ``False`` temporal vectors are
-           backed by raw q representation (:class:`.QTemporalList`, 
-           :class:`.QTemporal`) instances, otherwise are represented as 
+           backed by raw q representation (:class:`.QTemporalList`,
+           :class:`.QTemporal`) instances, otherwise are represented as
            `numpy datetime64`/`timedelta64` arrays and atoms,
            **Default**: ``False``
-         
+
         :returns: read data (parsed or raw byte form)
         '''
         self._options = MetaData(**CONVERSION_OPTIONS.union_dict(**options))
 
-        if is_compressed:
+        if compression_mode > 0:
+            comprHeaderLen = 4 if compression_mode == 1 else 8
             if self._stream:
-                self._buffer.wrap(self._read_bytes(4))
-            uncompressed_size = -8 + self._buffer.get_int()
-            compressed_data = self._read_bytes(message_size - 12) if self._stream else self._buffer.raw(message_size - 12)
+                self._buffer.wrap(self._read_bytes(comprHeaderLen))
+            uncompressed_size = -8 + (self._buffer.get_uint() if compression_mode == 1 else self._buffer.get_long())
+            compressed_data = self._read_bytes(message_size - (8+comprHeaderLen)) if self._stream else self._buffer.raw(message_size - (8+comprHeaderLen))
 
             raw_data = numpy.frombuffer(compressed_data, dtype = numpy.uint8)
             if  uncompressed_size <= 0:
                 raise QReaderException('Error while data decompression.')
 
-            raw_data = uncompress(raw_data, numpy.intc(uncompressed_size))
+            raw_data = uncompress(raw_data, numpy.int64(uncompressed_size))
             raw_data = numpy.ndarray.tostring(raw_data)
             self._buffer.wrap(raw_data)
         elif self._stream:
@@ -283,8 +284,9 @@ class QReader(object):
 
 
     def _read_list(self, qtype):
-        self._buffer.skip()  # ignore attributes
-        length = self._buffer.get_int()
+        attr = self._buffer.get_byte()
+        isLongLength = attr & 0x80 != 0
+        length = self._buffer.get_long() if isLongLength else self._buffer.get_uint()
         conversion = PY_TYPE.get(-qtype, None)
 
         if qtype == QSYMBOL_LIST:
@@ -414,7 +416,7 @@ class QReader(object):
         def endianness(self, endianness):
             '''
             Sets the byte order (endianness) for reading from the buffer.
-            
+
             :Parameters:
              - `endianness` (``<`` or ``>``) - byte order indicator
             '''
@@ -424,7 +426,7 @@ class QReader(object):
         def wrap(self, data):
             '''
             Wraps the data in the buffer.
-            
+
             :Parameters:
              - `data` - data to be wrapped
             '''
@@ -436,7 +438,7 @@ class QReader(object):
         def skip(self, offset = 1):
             '''
             Skips reading of `offset` bytes.
-            
+
             :Parameters:
              - `offset` (`integer`) - number of bytes to be skipped
             '''
@@ -451,10 +453,10 @@ class QReader(object):
         def raw(self, offset):
             '''
             Gets `offset` number of raw bytes.
-            
+
             :Parameters:
              - `offset` (`integer`) - number of bytes to be retrieved
-             
+
             :returns: raw bytes
             '''
             new_position = self._position + offset
@@ -470,11 +472,11 @@ class QReader(object):
         def get(self, fmt, offset = None):
             '''
             Gets bytes from the buffer according to specified format or `offset`.
-            
+
             :Parameters:
              - `fmt` (struct format) - conversion to be applied for reading
              - `offset` (`integer`) - number of bytes to be retrieved
-            
+
             :returns: unpacked bytes
             '''
             fmt = self.endianness + fmt
@@ -485,7 +487,7 @@ class QReader(object):
         def get_byte(self):
             '''
             Gets a single byte from the buffer.
-            
+
             :returns: single byte
             '''
             return self.get('b')
@@ -494,16 +496,34 @@ class QReader(object):
         def get_int(self):
             '''
             Gets a single 32-bit integer from the buffer.
-            
+
             :returns: single integer
             '''
             return self.get('i')
 
 
+        def get_uint(self):
+            '''
+            Gets a single 32-bit unsigned integer from the buffer.
+
+            :returns: single integer
+            '''
+            return self.get('I')
+
+
+        def get_long(self):
+            '''
+            Gets a single 64-bit integer from the buffer.
+
+            :returns: single integer
+            '''
+            return self.get('q')
+
+
         def get_symbol(self):
             '''
             Gets a single, ``\\x00`` terminated string from the buffer.
-            
+
             :returns: ``\\x00`` terminated string
             '''
             new_position = self._data.find(b'\x00', self._position)
@@ -519,10 +539,10 @@ class QReader(object):
         def get_symbols(self, count):
             '''
             Gets ``count`` ``\\x00`` terminated strings from the buffer.
-            
+
             :Parameters:
              - `count` (`integer`) - number of strings to be read
-            
+
             :returns: list of ``\\x00`` terminated string read from the buffer
             '''
             c = 0

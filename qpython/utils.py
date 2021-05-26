@@ -18,19 +18,19 @@ import numpy
 
 
 def uncompress(data, uncompressed_size):
-    _0 = numpy.intc(0)
-    _1 = numpy.intc(1)
-    _2 = numpy.intc(2)
-    _128 = numpy.intc(128)
-    _255 = numpy.intc(255)
+    _0 = numpy.int64(0)
+    _1 = numpy.int64(1)
+    _2 = numpy.int64(2)
+    _128 = numpy.int64(128)
+    _255 = numpy.int64(255)
 
     n, r, s, p = _0, _0, _0, _0
     i, d = _1, _1
     f = _255 & data[_0]
 
-    ptrs = numpy.zeros(256, dtype = numpy.intc)
+    ptrs = numpy.zeros(256, dtype = numpy.int64)
     uncompressed = numpy.zeros(uncompressed_size, dtype = numpy.uint8)
-    idx = numpy.arange(uncompressed_size, dtype = numpy.intc)
+    idx = numpy.arange(uncompressed_size, dtype = numpy.int64)
 
     while s < uncompressed_size:
         pp = p + _1
