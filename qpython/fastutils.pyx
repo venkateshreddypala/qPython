@@ -17,9 +17,8 @@
 import numpy
 cimport numpy
 
-DTYPE = numpy.int
-ctypedef numpy.int_t DTYPE_t
-DTYPE8 = numpy.int
+DTYPE = numpy.int64
+ctypedef numpy.int64_t DTYPE_t
 ctypedef numpy.uint8_t DTYPE8_t
 
 
@@ -31,17 +30,26 @@ def uncompress(numpy.ndarray[DTYPE8_t] data, DTYPE_t uncompressed_size):
 
     cdef numpy.ndarray[DTYPE_t] ptrs = numpy.zeros(256, dtype = DTYPE)
     cdef numpy.ndarray[DTYPE8_t] uncompressed = numpy.zeros(uncompressed_size, dtype = numpy.uint8)
-    cdef numpy.ndarray[DTYPE_t] idx = numpy.arange(uncompressed_size, dtype = DTYPE)
 
     f = 0xff & data[0]
+    curr=0
+    step=10000000
 
     while s < uncompressed_size:
         pp = p + 1
 
+        if s>=curr:
+            print("{}/{}".format(s,uncompressed_size))
+            curr+=step
+
         if f & i:
             r = ptrs[data[d]]
             n = 2 + data[d + 1]
-            uncompressed[idx[s:s + n]] = uncompressed[r:r + n]
+            if r+n<=s:
+                uncompressed[s:s + n] = uncompressed[r:r + n]
+            else:   #overlapping slices!
+                for ii in range(n):
+                    uncompressed[s+ii] = uncompressed[r+ii]
 
             ptrs[uncompressed[p] ^ uncompressed[pp]] = p
             if s == pp:

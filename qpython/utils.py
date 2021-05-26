@@ -30,7 +30,6 @@ def uncompress(data, uncompressed_size):
 
     ptrs = numpy.zeros(256, dtype = numpy.int64)
     uncompressed = numpy.zeros(uncompressed_size, dtype = numpy.uint8)
-    idx = numpy.arange(uncompressed_size, dtype = numpy.int64)
 
     while s < uncompressed_size:
         pp = p + _1
@@ -38,7 +37,11 @@ def uncompress(data, uncompressed_size):
         if f & i:
             r = ptrs[data[d]]
             n = _2 + data[d + _1]
-            uncompressed[idx[s:s + n]] = uncompressed[r:r + n]
+            if r+n<=s:
+                uncompressed[s:s + n] = uncompressed[r:r + n]
+            else:   #overlapping slices!
+                for ii in range(n):
+                    uncompressed[s+ii] = uncompressed[r+ii]
 
             ptrs[(uncompressed[p]) ^ (uncompressed[pp])] = p
             if s == pp:

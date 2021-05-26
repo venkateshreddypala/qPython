@@ -30,8 +30,6 @@ try:
 except:
     from qpython.utils import uncompress
 
-
-
 class QReaderException(Exception):
     '''
     Indicates an error raised during data deserialization.
