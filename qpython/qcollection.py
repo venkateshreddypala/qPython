@@ -16,7 +16,7 @@
 
 from qpython.qtype import *  # @UnusedWildImport
 from qpython import MetaData
-from qpython.qtemporal import qtemporal, from_raw_qtemporal, to_raw_qtemporal
+from qpython.qtemporal import qtemporal, QTemporal, from_raw_qtemporal, to_raw_qtemporal
 
 
 class QList(numpy.ndarray):
@@ -66,6 +66,8 @@ class QTemporalList(QList):
         '''
         return numpy.ndarray.__getitem__(self, idx)
 
+    def __repr__(self):
+        return numpy.array2string(self, separator=', ', formatter={"int": QTemporal.__str__})
 
 
 def get_list_qtype(array):
