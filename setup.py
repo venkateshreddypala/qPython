@@ -28,6 +28,7 @@ except:
 try:
     from Cython.Build import cythonize
 except ImportError:
+    print("unable to load cython, not using it")
     use_cython = False
 else:
     use_cython = True
