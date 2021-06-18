@@ -32,15 +32,9 @@ def uncompress(numpy.ndarray[DTYPE8_t] data, DTYPE_t uncompressed_size):
     cdef numpy.ndarray[DTYPE8_t] uncompressed = numpy.zeros(uncompressed_size, dtype = numpy.uint8)
 
     f = 0xff & data[0]
-    curr=0
-    step=10000000
 
     while s < uncompressed_size:
         pp = p + 1
-
-        if s>=curr:
-            print("{}/{}".format(s,uncompressed_size))
-            curr+=step
 
         if f & i:
             r = ptrs[data[d]]
