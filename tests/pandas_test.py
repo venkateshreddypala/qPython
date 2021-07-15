@@ -282,6 +282,7 @@ try:
                     if 'index' in value:
                         meta = result.meta
                         result = result.reset_index()
+                        result._metadata = ["meta"]
                         result.meta = meta
 
                     if not 'compare_meta' in value or value['compare_meta']:
@@ -309,6 +310,7 @@ try:
                     data = data.set_index(value['index'])
                 if 'single_char_strings' in value:
                     single_char_strings = value['single_char_strings']
+                data._metadata = ["meta"]
                 data.meta = value['meta']
             else:
                 data = value

@@ -27,7 +27,10 @@ class QList(numpy.ndarray):
         self.meta = MetaData(**meta)
 
     def __eq__(self, other):
-        return numpy.array_equal(self, other)
+        if (type(other) == QList or
+            type(other).__module__ == 'pandas.core.series' and type(other).__name__ == 'Series'):
+                return numpy.array_equal(self, other)
+        return super().__eq__(other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -399,7 +402,7 @@ def qtable(columns, data, **meta):
 class QKeyedTable(object):
     '''Represents a q keyed table.
     
-    :class:`.QKeyedTable` is built with two :class:`.QTable`\s, one representing
+    :class:`.QKeyedTable` is built with two :class:`.QTable`s, one representing
     keys and the other values.
     
     Keyed tables example:

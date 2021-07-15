@@ -98,6 +98,7 @@ class PandasQReader(QReader):
                     odict[column_name] = data[i]
 
             df = pandas.DataFrame(odict)
+            df._metadata = ["meta"]
             df.meta = meta
             return df
         else:
@@ -111,7 +112,7 @@ class PandasQReader(QReader):
         qlist = QReader._read_list(self, qtype = qtype)
 
         if self._options.pandas:
-            if -abs(qtype) not in [QMONTH, QDATE, QDATETIME, QMINUTE, QSECOND, QTIME, QTIMESTAMP, QTIMESPAN, QSYMBOL]:
+            if -abs(qtype) not in [QBOOL, QMONTH, QDATE, QDATETIME, QMINUTE, QSECOND, QTIME, QTIMESTAMP, QTIMESPAN, QSYMBOL]:
                 null = QNULLMAP[-abs(qtype)][1]
                 ps = pandas.Series(data = qlist).replace(null, numpy.NaN)
             else:
