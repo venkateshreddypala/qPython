@@ -1,0 +1,55 @@
+name: QPython publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (x.y.z)"
+        required: true
+      prod:
+        description: "Use the real PyPI instead of the test one"
+        type: boolean
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Input check
+        env:
+          version: ${{ github.event.inputs.version }}
+        run: |
+          if ! [[ $version =~ ^[0-9.]+$ ]]; then echo invalid version; exit 1; fi
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade wheel
+          pip install -r requirements.txt -U
+      - name: Build
+        run: |
+          sed -i "s/@@VERSION_PLACEHOLDER@@/${{ github.event.inputs.version }}/g" qpython/__init__.py
+          python setup.py build_ext --inplace
+          python setup.py sdist
+      - name: Test
+        run: |
+          env PYTHONPATH=. py.test
+      - name: Build manylinux
+        uses: RalfG/python-wheels-manylinux-build@v0.3.4
+        with:
+          python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39'
+          build-requirements: 'cython numpy'
+      - name: Publish
+        env:
+          prodInput: ${{ github.event.inputs.prod }}
+        run: |
+          pip install --upgrade twine
+          find dist -name "*-linux*" -delete
+          ls -l dist
+          repoParam=
+          if [[ -z ${prodInput} ]]; then repoParam="--repository testpypi"; fi
+          twine upload ${repoParam} dist/* --username __token__ --password ${{ secrets.PYPI_API }}
