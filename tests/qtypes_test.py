@@ -177,6 +177,9 @@ def test_qtemporallist():
         assert t[x].raw == na_dt[x]
         x += 1
 
+    monthList = qlist(numpy.array([12, qnull(QMONTH)]), qtype=QMONTH_LIST)
+    assert str(monthList) == '[2001-01, NaT]'
+    assert repr(monthList) == 'QTemporalList([2001-01, NaT], qtype=-13)'
 
 def test_array_to_raw_qtemporal():
     na_dt = numpy.arange('1999-01', '2005-12', dtype='datetime64[M]')
