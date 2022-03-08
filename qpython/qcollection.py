@@ -70,6 +70,9 @@ class QTemporalList(QList):
         return numpy.ndarray.__getitem__(self, idx)
 
     def __repr__(self):
+        return 'QTemporalList({}, qtype={})'.format(numpy.array2string(self, separator=', ', formatter={"int": QTemporal.__str__}), -abs(self.meta.qtype))
+
+    def __str__(self):
         return numpy.array2string(self, separator=', ', formatter={"int": QTemporal.__str__})
 
 
