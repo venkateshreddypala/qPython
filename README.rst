@@ -65,6 +65,13 @@ Instructions:
 - Execute: ``py.test``
 
 
+CVE Scanning
+~~~~~~~~~~~~
+
+Configured GitHub Action as per the "Python" section of:
+- https://github.com/maoo/security-scanning
+
+
 Requirements
 ~~~~~~~~~~~~
 
